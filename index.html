@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão Escolar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #F3F4F6;
+            --bg-sidebar: #1E1B4B; /* Roxo bem escuro */
+            --bg-card: #FFFFFF;
+            --bg-header: rgba(255, 255, 255, 0.7);
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
+            --text-sidebar: #E0E7FF;
+            --purple-dark: #6B21A8;
+            --purple-medium: #8B5CF6;
+            --purple-light: #EDE9FE;
+        }
+
+        html.dark {
+            --bg-main: #111827;
+            --bg-sidebar: #1E1B4B;
+            --bg-card: #1F2937;
+            --bg-header: rgba(17, 24, 39, 0.7);
+            --text-primary: #F9FAFB;
+            --text-secondary: #9CA3AF;
+            --text-sidebar: #E0E7FF;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+        }
+
+        /* --- Custom Scrollbar --- */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--purple-light); }
+        ::-webkit-scrollbar-thumb { background: var(--purple-medium); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--purple-dark); }
+        html.dark ::-webkit-scrollbar-track { background: #374151; }
+
+        /* --- Animated Background --- */
+        #animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            background: linear-gradient(135deg, #581c87, #7e22ce);
+        }
+
+        .shape {
+            position: absolute;
+            list-style: none;
+            display: block;
+            background: rgba(255, 255, 255, 0.2);
+            animation: animateShapes 20s linear infinite;
+            bottom: -150px;
+        }
+        .shape-1 { left: 10%; width: 80px; height: 80px; animation-duration: 45s; }
+        .shape-2 { left: 20%; width: 30px; height: 30px; animation-duration: 25s; border-radius: 50%; }
+        .shape-3 { left: 30%; width: 100px; height: 100px; animation-duration: 55s; }
+        .shape-4 { left: 40%; width: 40px; height: 40px; animation-duration: 30s; border-radius: 50%; }
+        .shape-5 { left: 50%; width: 20px; height: 20px; animation-duration: 15s; }
+        .shape-6 { left: 60%; width: 110px; height: 110px; animation-duration: 35s; border-radius: 50%; }
+        @keyframes animateShapes {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0.7; border-radius: 20%; }
+            100% { transform: translateY(-120vh) rotate(720deg); opacity: 0.1; border-radius: 50%; }
+        }
+
+        /* --- General Transitions & Effects --- */
+        #sidebar, #main-content, .modal-content, .modal-backdrop, .animated-button, body, header, aside, .card-lift {
+            transition: all 0.5s ease-in-out;
+        }
+        
+        .page {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            display: none;
+        }
+        .page.active {
+            opacity: 1;
+            transform: translateY(0);
+            display: block;
+        }
+
+        .mobile-menu-open { transform: translateX(0) !important; }
+        
+        .animated-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .animated-button { will-change: transform; }
+
+        .card-lift {
+            background-color: var(--bg-card);
+        }
+        .card-lift:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+        }
+
+        /* --- Component Styles --- */
+        aside { background-color: var(--bg-sidebar); }
+        .nav-link { color: var(--text-sidebar); }
+        header { background-color: var(--bg-header); }
+        .modal-backdrop { background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: var(--bg-card); }
+
+        /* --- Dark Mode Specifics --- */
+        html.dark .text-gray-800 { color: var(--text-primary); }
+        html.dark .text-gray-500 { color: var(--text-secondary); }
+        html.dark .text-purple-800 { color: var(--purple-medium); }
+        html.dark .bg-purple-50 { background-color: rgba(139, 92, 246, 0.1); }
+        html.dark .border { border-color: #4B5563; }
+        html.dark .bg-gray-100 { background-color: #374151; }
+
+        /* --- Calendar & Attendance --- */
+        .calendar-day { padding: 8px; border: 1px solid #e5e7eb; min-height: 100px; }
+        html.dark .calendar-day { border-color: #4B5563; }
+        .calendar-day.other-month { color: #9ca3af; background-color: #f9fafb; }
+        html.dark .calendar-day.other-month { background-color: #1F2937; }
+        .calendar-day-header { font-weight: 600; text-align: center; padding: 8px 0; }
+        .event-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .btn-frequencia { padding: 4px 8px; border-radius: 6px; color: white; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+        .btn-presente { background-color: #22c55e; }
+        .btn-ausente { background-color: #ef4444; }
+        .btn-frequencia.active { outline: 2px solid #3b82f6; outline-offset: 2px; transform: scale(1.05); }
+
+        /* --- Print Styles --- */
+        @media print {
+            body, html { background-color: #fff !important; }
+            body > *:not(#modal-container) { display: none; }
+            #modal-container { position: static !important; display: block !important; overflow: visible !important; }
+            #modal-backdrop { display: none !important; }
+            #modal-content { box-shadow: none !important; border: none !important; width: 100% !important; max-width: 100% !important; transform: none !important; opacity: 1 !important; position: static !important; }
+            .print-hidden { display: none !important; }
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="animated-bg">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+        <div class="shape shape-5"></div>
+        <div class="shape shape-6"></div>
+    </div>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 text-white flex-shrink-0 transform -translate-x-full md:translate-x-0 fixed md:relative h-full z-30">
+            <div class="p-5 text-2xl font-bold border-b border-purple-700 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-marked"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="m14 6-4 4 4 4"/></svg>
+                <span>SGE Painel</span>
+            </div>
+            <nav class="mt-5">
+                <a href="#dashboard" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Dashboard</a>
+                <a href="#alunos" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Alunos</a>
+                <a href="#turmas" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><path d="M14 22v-4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v4"/><path d="M18 10h4"/><path d="M12 10h.01"/><path d="m2 18 10-6 10 6"/><path d="M12 2v8"/></svg>Turmas & Disciplinas</a>
+                <a href="#notas" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>Lançamento de Notas</a>
+                <a href="#frequencia" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>Frequência</a>
+                <a href="#calendario" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>Calendário</a>
+                <a href="#relatorios" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>Relatórios</a>
+                <a href="#configuracoes" class="nav-link flex items-center py-3 px-5 hover:bg-purple-700 rounded-md mx-2 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-3"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.22l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0-2.22l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Configurações</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div id="main-content" class="flex-1 flex flex-col overflow-hidden md:ml-64">
+            <header class="shadow-sm flex justify-between items-center p-4 backdrop-blur-md">
+                <button id="hamburger-btn" class="text-gray-600 focus:outline-none md:hidden">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <h1 id="page-title" class="text-xl font-semibold">Dashboard</h1>
+                <div class="flex items-center gap-4">
+                     <button id="dark-mode-toggle" class="p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                        <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 hidden"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
+                    <span class="text-gray-700 hidden sm:block">Olá, Admin</span>
+                    <img src="https://placehold.co/40x40/8B5CF6/FFFFFF?text=A" alt="Avatar" class="w-10 h-10 rounded-full border-2 border-purple-500">
+                </div>
+            </header>
+
+            <main id="main-container" class="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-8">
+                <!-- Pages will be dynamically loaded here -->
+            </main>
+        </div>
+    </div>
+    
+    <div id="modal-container" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div id="modal-backdrop" class="modal-backdrop fixed inset-0 opacity-0"></div>
+        <div id="modal-content" class="modal-content w-full max-w-lg mx-auto z-10 transform scale-95 opacity-0"></div>
+    </div>
+
+    <!-- Templates for Pages -->
+    <template id="dashboard-page">
+        <div id="dashboard" class="page">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <!-- Card Presença -->
+                <div class="p-6 rounded-xl shadow-md flex flex-col justify-between card-lift">
+                    <h3 class="font-semibold text-lg mb-2">Presença Hoje</h3>
+                    <div class="flex items-center justify-center my-4">
+                        <div id="presenca-hoje-stat" class="text-5xl font-bold text-green-500">0%</div>
+                    </div>
+                    <p class="text-sm text-center text-gray-500">Porcentagem de alunos presentes na data de hoje.</p>
+                </div>
+
+                <!-- Card Desempenho -->
+                <div class="p-6 rounded-xl shadow-md flex flex-col justify-between card-lift">
+                     <h3 class="font-semibold text-lg mb-2">Desempenho da Turma</h3>
+                     <div class="h-40"><canvas id="desempenho-turma-chart"></canvas></div>
+                     <p class="text-sm text-center text-gray-500 mt-2">Média geral das disciplinas para a turma 9A.</p>
+                </div>
+
+                <!-- Card Ranking -->
+                <div class="p-6 rounded-xl shadow-md flex flex-col justify-between card-lift">
+                    <h3 class="font-semibold text-lg mb-2">Ranking de Alunos</h3>
+                    <ul id="ranking-alunos-list" class="space-y-3 mt-2">
+                        <!-- Ranking will be populated by JS -->
+                    </ul>
+                </div>
+            </div>
+             <div class="mt-8 p-6 rounded-xl shadow-md card-lift">
+                <h2 class="text-xl font-semibold mb-4">Atividade Recente</h2>
+                <ul id="log-atividades-container" class="space-y-4"></ul>
+            </div>
+        </div>
+    </template>
+
+    <template id="alunos-page">
+        <div id="alunos" class="page">
+            <div class="p-6 rounded-xl shadow-md card-lift">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h2 class="text-xl font-semibold">Gerenciamento de Alunos</h2>
+                    <div class="flex items-center gap-2">
+                        <input id="search-aluno" type="text" placeholder="Buscar..." class="w-full md:w-64 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <button id="add-aluno-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 animated-button">Adicionar Aluno</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 mb-4">
+                     <button id="import-csv-btn" class="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm animated-button">Importar CSV</button>
+                     <input type="file" id="csv-file-input" class="hidden" accept=".csv">
+                     <button id="export-csv-btn" class="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm animated-button">Exportar CSV</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-purple-50"><th class="p-3">Matrícula</th><th class="p-3">Nome</th><th class="p-3">Turma</th><th class="p-3">Nascimento</th><th class="p-3">Ações</th></tr></thead>
+                        <tbody id="alunos-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="turmas-page">
+        <div id="turmas" class="page">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="p-6 rounded-xl shadow-md card-lift">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold">Turmas</h2>
+                        <button id="add-turma-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 animated-button">Nova Turma</button>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-purple-50"><th class="p-3">Nome</th><th class="p-3">Ano</th><th class="p-3">Turno</th><th class="p-3">Ações</th></tr></thead>
+                        <tbody id="turmas-table-body"></tbody>
+                    </table>
+                </div>
+                <div class="p-6 rounded-xl shadow-md card-lift">
+                     <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold">Disciplinas</h2>
+                        <button id="add-disciplina-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 animated-button">Nova Disciplina</button>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-purple-50"><th class="p-3">Nome</th><th class="p-3">Código</th><th class="p-3">Ações</th></tr></thead>
+                        <tbody id="disciplinas-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="notas-page">
+        <div id="notas" class="page">
+            <div class="p-6 rounded-xl shadow-md card-lift">
+                <h2 class="text-xl font-semibold mb-6">Lançamento de Notas</h2>
+                <div class="flex flex-col md:flex-row gap-4 mb-6">
+                    <select id="select-turma-notas" class="flex-1 p-2 border rounded-lg"></select>
+                    <select id="select-disciplina-notas" class="flex-1 p-2 border rounded-lg"></select>
+                </div>
+                <div id="notas-alunos-container" class="hidden overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-purple-50"><th class="p-3">Aluno</th><th class="p-3">Bim 1</th><th class="p-3">Bim 2</th><th class="p-3">Bim 3</th><th class="p-3">Bim 4</th><th class="p-3">Média</th></tr></thead>
+                        <tbody id="notas-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="frequencia-page">
+        <div id="frequencia" class="page">
+            <div class="p-6 rounded-xl shadow-md card-lift">
+                <h2 class="text-xl font-semibold mb-6">Controle de Frequência</h2>
+                <div class="flex flex-col md:flex-row gap-4 mb-6">
+                    <select id="select-turma-frequencia" class="flex-1 p-2 border rounded-lg"></select>
+                    <select id="select-disciplina-frequencia" class="flex-1 p-2 border rounded-lg"></select>
+                    <input type="date" id="data-frequencia" class="p-2 border rounded-lg">
+                </div>
+                <div id="frequencia-alunos-container" class="hidden overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead><tr class="bg-purple-50"><th class="p-3">Aluno</th><th class="p-3">Status</th></tr></thead>
+                        <tbody id="frequencia-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="calendario-page">
+        <div id="calendario" class="page">
+            <div class="p-6 rounded-xl shadow-md card-lift">
+                <div class="flex justify-between items-center mb-6">
+                    <button id="prev-month" class="p-2 rounded-full hover:bg-gray-200 animated-button">&lt;</button>
+                    <h2 id="calendar-title" class="text-xl font-semibold"></h2>
+                    <button id="next-month" class="p-2 rounded-full hover:bg-gray-200 animated-button">&gt;</button>
+                </div>
+                <div id="calendar-headers" class="grid grid-cols-7 gap-1"></div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+                 <div class="mt-4">
+                    <h3 class="font-semibold mb-2">Legenda:</h3>
+                    <div class="flex items-center gap-4 text-sm">
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Prova</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500"></span> Evento</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> Entrega</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="relatorios-page">
+        <div id="relatorios" class="page">
+            <div class="p-6 rounded-xl shadow-md card-lift mb-8">
+                <h2 class="text-xl font-semibold mb-6">Boletim Individual</h2>
+                <div class="flex items-center gap-4">
+                    <select id="select-aluno-boletim" class="flex-1 p-2 border rounded-lg"></select>
+                    <button id="gerar-boletim-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg animated-button">Gerar Boletim</button>
+                </div>
+            </div>
+            
+            <div class="p-6 rounded-xl shadow-md card-lift mb-8">
+                <h2 class="text-xl font-semibold mb-6">Análise de Desempenho do Aluno</h2>
+                 <div class="flex items-center gap-4 mb-4">
+                    <select id="select-aluno-grafico" class="flex-1 p-2 border rounded-lg"></select>
+                </div>
+                <div class="h-80"><canvas id="desempenho-chart"></canvas></div>
+            </div>
+            
+            <div class="p-6 rounded-xl shadow-md card-lift">
+                 <h2 class="text-xl font-semibold mb-6">Relatórios da Turma</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <button id="relatorio-recuperacao-btn" class="bg-blue-500 text-white p-4 rounded-lg animated-button">Alunos em Recuperação</button>
+                     <button id="relatorio-faltas-btn" class="bg-yellow-500 text-white p-4 rounded-lg animated-button">Histórico de Faltas</button>
+                     <button id="relatorio-media-turma-btn" class="bg-green-500 text-white p-4 rounded-lg animated-button">Médias por Turma</button>
+                 </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="configuracoes-page">
+        <div id="configuracoes" class="page">
+            <div class="p-6 rounded-xl shadow-md max-w-2xl mx-auto card-lift">
+                 <h2 class="text-xl font-semibold mb-6">Configurações</h2>
+                 <div class="space-y-6">
+                    <div>
+                        <label for="media-aprovacao" class="block text-sm font-medium">Média Mínima para Aprovação</label>
+                        <input type="number" id="media-aprovacao" step="0.1" class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-purple-500 sm:text-sm">
+                    </div>
+                     <div>
+                        <label for="ano-letivo" class="block text-sm font-medium">Ano Letivo Atual</label>
+                        <input type="number" id="ano-letivo" class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-purple-500 sm:text-sm">
+                    </div>
+                    <button id="salvar-config-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 animated-button">Salvar Configurações</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // --- DATABASE ---
+        let db = {
+            alunos: [
+                { id: 1, matricula: "2025-001", nome: "João Silva", dataNascimento: "2011-03-12", turmaId: 1, email: "joao.silva@escola.edu.br" },
+                { id: 2, matricula: "2025-002", nome: "Maria Oliveira", dataNascimento: "2011-05-20", turmaId: 1, email: "maria.o@escola.edu.br" },
+                { id: 3, matricula: "2025-003", nome: "Pedro Santos", dataNascimento: "2012-01-15", turmaId: 2, email: "pedro.s@escola.edu.br" },
+            ],
+            turmas: [
+                { id: 1, nome: "9A", anoLetivo: 2025, turno: "Manhã" },
+                { id: 2, nome: "8B", anoLetivo: 2025, turno: "Tarde" },
+            ],
+            disciplinas: [
+                { id: 1, nome: "Matemática", codigo: "MAT9" },
+                { id: 2, nome: "Português", codigo: "PORT9" },
+                { id: 3, nome: "Ciências", codigo: "CIE8" },
+            ],
+            notas: [
+                { alunoId: 1, disciplinaId: 1, b1: 8.5, b2: 9.0, b3: 7.5, b4: 8.0 },
+                { alunoId: 1, disciplinaId: 2, b1: 9.0, b2: 9.5, b3: 8.5, b4: 9.0 },
+                { alunoId: 2, disciplinaId: 1, b1: 7.0, b2: 6.5, b3: 8.0, b4: 7.5 },
+                { alunoId: 3, disciplinaId: 3, b1: 5.0, b2: 4.5, b3: 6.0, b4: 5.5 },
+            ],
+            frequencia: [],
+            eventos: [
+                { data: `${new Date().getFullYear()}-10-15`, titulo: 'Prova de Matemática', tipo: 'prova' },
+                { data: `${new Date().getFullYear()}-10-22`, titulo: 'Festa da Primavera', tipo: 'evento' },
+                { data: `${new Date().getFullYear()}-11-05`, titulo: 'Entrega de Trabalho', tipo: 'entrega' },
+            ],
+            logAtividades: [
+                { type: 'info', message: 'Bem-vindo ao Painel SGE!', timestamp: new Date(), details: {} }
+            ],
+            config: {
+                mediaAprovacao: 6.0,
+                anoLetivo: new Date().getFullYear()
+            }
+        };
+        let currentChart = null;
+        let desempenhoTurmaChart = null;
+        let currentCalendarDate = new Date();
+
+        // --- UTILS ---
+        const getNextId = (collection) => db[collection].length > 0 ? Math.max(...db[collection].map(item => item.id)) + 1 : 1;
+        const showSkeleton = (tbody) => {
+            const cols = tbody.closest('table').querySelector('thead th').length;
+            tbody.innerHTML = Array(3).fill(`<tr>${Array(cols).fill('<td class="p-3"><div class="h-4 skeleton"></div></td>').join('')}</tr>`).join('');
+        };
+        const renderWithSkeleton = (tbodyId, renderFn, ...args) => {
+            const tbody = document.getElementById(tbodyId);
+            if (tbody) {
+                showSkeleton(tbody);
+                setTimeout(() => renderFn(...args), 500);
+            }
+        };
+        const logActivity = (type, message, details = {}) => {
+            db.logAtividades.unshift({ type, message, details, timestamp: new Date() });
+            if (db.logAtividades.length > 3) db.logAtividades.pop();
+            if (window.location.hash === '#dashboard' || window.location.hash === '') renderLogAtividades();
+        };
+        const formatTimeAgo = (date) => {
+            const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+            if (seconds < 60) return 'agora mesmo';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `há ${minutes} min`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `há ${hours}h`;
+            const days = Math.floor(hours / 24);
+            return `há ${days}d`;
+        };
+
+        // --- MODAL ---
+        const openModal = (title, content, maxWidth = 'max-w-lg') => {
+            const modalContainer = document.getElementById('modal-container');
+            const modalContentEl = document.getElementById('modal-content');
+            modalContentEl.className = `modal-content w-full ${maxWidth} mx-auto z-10 transform scale-95 opacity-0`;
+            modalContentEl.innerHTML = `
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-semibold">${title}</h3><button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button></div>
+                    <div>${content}</div>
+                </div>`;
+            modalContainer.classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('modal-backdrop').classList.add('opacity-100');
+                modalContentEl.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+            document.getElementById('close-modal-btn').onclick = closeModal;
+            document.getElementById('modal-backdrop').onclick = closeModal;
+        };
+        const closeModal = () => {
+            const modalContainer = document.getElementById('modal-container');
+            document.getElementById('modal-backdrop').classList.remove('opacity-100');
+            document.getElementById('modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => modalContainer.classList.add('hidden'), 300);
+        };
+        
+        // --- NAVIGATION & PAGE LOADING ---
+        const mainContainer = document.getElementById('main-container');
+        const loadPage = (pageId) => {
+            const template = document.getElementById(`${pageId}-page`);
+            if (template) {
+                mainContainer.innerHTML = '';
+                const content = template.content.cloneNode(true);
+                mainContainer.appendChild(content);
+                const pageElement = mainContainer.querySelector('.page');
+                setTimeout(() => pageElement.classList.add('active'), 50);
+                const navLink = document.querySelector(`.nav-link[href="#${pageId}"]`);
+                if (navLink) {
+                    document.getElementById('page-title').textContent = navLink.textContent;
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('bg-purple-700'));
+                    navLink.classList.add('bg-purple-700');
+                }
+                bindPageEventListeners(pageId);
+            }
+        };
+        const setupNavigation = () => {
+             document.querySelectorAll('.nav-link').forEach(link => {
+                link.onclick = e => {
+                    e.preventDefault();
+                    const pageId = e.currentTarget.getAttribute('href').substring(1);
+                    const activePage = mainContainer.querySelector('.page.active');
+                    if(activePage) activePage.classList.remove('active');
+                    setTimeout(() => {
+                       window.location.hash = pageId;
+                       loadPage(pageId);
+                    }, 300);
+                };
+            });
+            document.getElementById('hamburger-btn').onclick = () => document.getElementById('sidebar').classList.toggle('mobile-menu-open');
+        };
+
+        // --- DARK MODE ---
+        const setupDarkMode = () => {
+            const toggle = document.getElementById('dark-mode-toggle');
+            const lightIcon = document.getElementById('theme-icon-light');
+            const darkIcon = document.getElementById('theme-icon-dark');
+            
+            const applyTheme = (isDark) => {
+                document.documentElement.classList.toggle('dark', isDark);
+                lightIcon.classList.toggle('hidden', isDark);
+                darkIcon.classList.toggle('hidden', !isDark);
+            };
+
+            toggle.addEventListener('click', () => {
+                const isDark = document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                applyTheme(isDark);
+            });
+
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            applyTheme(savedTheme === 'dark' || (savedTheme === null && prefersDark));
+        };
+
+        // --- EVENT BINDING ROUTER ---
+        function bindPageEventListeners(pageId) {
+            switch (pageId) {
+                case 'dashboard': renderDashboard(); break;
+                case 'alunos':
+                    renderWithSkeleton('alunos-table-body', renderAlunos);
+                    document.getElementById('add-aluno-btn').onclick = () => showAlunoForm();
+                    document.getElementById('search-aluno').oninput = (e) => renderAlunos(e.target.value);
+                    document.getElementById('import-csv-btn').onclick = () => document.getElementById('csv-file-input').click();
+                    document.getElementById('csv-file-input').onchange = handleCsvImport;
+                    document.getElementById('export-csv-btn').onclick = handleCsvExport;
+                    break;
+                case 'turmas':
+                    renderWithSkeleton('turmas-table-body', renderTurmas);
+                    renderWithSkeleton('disciplinas-table-body', renderDisciplinas);
+                    document.getElementById('add-turma-btn').onclick = () => showTurmaForm();
+                    document.getElementById('add-disciplina-btn').onclick = () => showDisciplinaForm();
+                    break;
+                case 'notas':
+                    populateNotasSelects();
+                    document.getElementById('select-turma-notas').onchange = renderNotasTable;
+                    document.getElementById('select-disciplina-notas').onchange = renderNotasTable;
+                    break;
+                case 'frequencia':
+                    populateFrequenciaSelects();
+                    document.getElementById('data-frequencia').valueAsDate = new Date();
+                    document.getElementById('select-turma-frequencia').onchange = renderFrequenciaTable;
+                    document.getElementById('select-disciplina-frequencia').onchange = renderFrequenciaTable;
+                    document.getElementById('data-frequencia').onchange = renderFrequenciaTable;
+                    renderFrequenciaTable();
+                    break;
+                case 'calendario':
+                    renderCalendario();
+                    document.getElementById('prev-month').onclick = () => changeMonth(-1);
+                    document.getElementById('next-month').onclick = () => changeMonth(1);
+                    break;
+                case 'relatorios':
+                    populateBoletimSelect();
+                    populateGraficoSelect();
+                    document.getElementById('gerar-boletim-btn').onclick = gerarBoletim;
+                    document.getElementById('select-aluno-grafico').onchange = renderGraficoDesempenho;
+                    document.getElementById('relatorio-recuperacao-btn').onclick = gerarRelatorioRecuperacao;
+                    document.getElementById('relatorio-faltas-btn').onclick = gerarRelatorioFaltas;
+                    document.getElementById('relatorio-media-turma-btn').onclick = gerarRelatorioMediaTurma;
+                    renderGraficoDesempenho();
+                    break;
+                case 'configuracoes':
+                    loadConfig();
+                    document.getElementById('salvar-config-btn').onclick = saveConfig;
+                    break;
+            }
+        }
+        
+        // --- RENDER FUNCTIONS ---
+        function renderDashboard() {
+            renderDashboardPresenca();
+            renderDashboardDesempenhoTurma();
+            renderDashboardRanking();
+            renderLogAtividades();
+        }
+        function renderDashboardPresenca() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const presencasHoje = db.frequencia.filter(f => f.data === todayStr);
+            const presentes = presencasHoje.filter(f => f.presente).length;
+            const total = presencasHoje.length;
+            const porcentagem = total > 0 ? Math.round((presentes / total) * 100) : 0;
+            document.getElementById('presenca-hoje-stat').textContent = `${porcentagem}%`;
+        }
+        function renderDashboardDesempenhoTurma() {
+            const canvas = document.getElementById('desempenho-turma-chart');
+            if (!canvas) return;
+            const turmaId = 1; // Turma 9A
+            const alunosTurma = db.alunos.filter(a => a.turmaId === turmaId);
+            const labels = db.disciplinas.map(d => d.nome);
+            const data = db.disciplinas.map(d => {
+                const notasDisciplina = db.notas.filter(n => n.disciplinaId === d.id && alunosTurma.some(a => a.id === n.alunoId));
+                if (notasDisciplina.length === 0) return 0;
+                const medias = notasDisciplina.map(n => [n.b1, n.b2, n.b3, n.b4].filter(v => v !== null).reduce((a,b,_,arr) => a + b/arr.length, 0));
+                return medias.reduce((a,b,_,arr) => a + b/arr.length, 0);
+            });
+            
+            if(desempenhoTurmaChart) desempenhoTurmaChart.destroy();
+            desempenhoTurmaChart = new Chart(canvas.getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        backgroundColor: ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B'],
+                        borderColor: 'transparent'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+        function renderDashboardRanking(){
+            const list = document.getElementById('ranking-alunos-list');
+            if(!list) return;
+            const ranking = db.alunos.map(aluno => {
+                const notas = db.notas.filter(n => n.alunoId === aluno.id);
+                if (notas.length === 0) return { nome: aluno.nome, media: 0 };
+                const medias = notas.map(n => [n.b1, n.b2, n.b3, n.b4].filter(v => v !== null).reduce((a,b,_,arr) => a + b/arr.length, 0));
+                const mediaGeral = medias.reduce((a,b,_,arr) => a + b/arr.length, 0);
+                return { nome: aluno.nome, media: mediaGeral.toFixed(1) };
+            }).sort((a,b) => b.media - a.media).slice(0, 3);
+
+            list.innerHTML = ranking.map((aluno, i) => `
+                <li class="flex items-center justify-between">
+                    <span class="font-medium">${i+1}. ${aluno.nome}</span>
+                    <span class="font-bold text-purple-600">${aluno.media}</span>
+                </li>
+            `).join('');
+        }
+        function renderLogAtividades() {
+            const container = document.getElementById('log-atividades-container');
+            if (!container) return;
+            container.innerHTML = db.logAtividades.map(log => `<li class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-start gap-3">${getLogIcon(log.type)} <div>${log.message} - <span class="text-sm text-secondary">${formatTimeAgo(log.timestamp)}</span></div></li>`).join('');
+        }
+        function getLogIcon(type) {
+            const icons = {
+                aluno: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-purple-600 mt-1"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
+                turma: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-blue-600 mt-1"><path d="m2 18 10-6 10 6"/><path d="M12 2v8"/></svg>',
+                disciplina: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-green-600 mt-1"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+                nota: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-orange-600 mt-1"><path d="m9 14 2 2 4-4"/></svg>',
+                info: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-gray-500 mt-1"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+            };
+            return icons[type] || icons.info;
+        }
+        function renderAlunos(searchTerm = '') {
+            const tbody = document.getElementById('alunos-table-body');
+            const filtered = db.alunos.filter(a => a.nome.toLowerCase().includes(searchTerm.toLowerCase()));
+            tbody.innerHTML = filtered.map(aluno => {
+                const turma = db.turmas.find(t => t.id === aluno.turmaId);
+                return `<tr><td class="p-3">${aluno.matricula}</td><td class="p-3">${aluno.nome}</td><td class="p-3">${turma?.nome || 'N/A'}</td><td class="p-3">${aluno.dataNascimento}</td>
+                <td class="p-3 flex gap-2"><button onclick="showAlunoForm(${aluno.id})" class="text-purple-600 hover:text-purple-900"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button> <button onclick="deleteAluno(${aluno.id})" class="text-red-500 hover:text-red-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button></td></tr>`;
+            }).join('');
+        }
+        function renderTurmas() {
+            const tbody = document.getElementById('turmas-table-body');
+            tbody.innerHTML = db.turmas.map(t => `<tr><td class="p-3">${t.nome}</td><td class="p-3">${t.anoLetivo}</td><td class="p-3">${t.turno}</td>
+            <td class="p-3 flex gap-2"><button onclick="showTurmaForm(${t.id})" class="text-purple-600 hover:text-purple-900"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button> <button onclick="deleteTurma(${t.id})" class="text-red-500 hover:text-red-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button></td></tr>`).join('');
+        }
+        function renderDisciplinas() {
+            const tbody = document.getElementById('disciplinas-table-body');
+            tbody.innerHTML = db.disciplinas.map(d => `<tr><td class="p-3">${d.nome}</td><td class="p-3">${d.codigo}</td>
+            <td class="p-3 flex gap-2"><button onclick="showDisciplinaForm(${d.id})" class="text-purple-600 hover:text-purple-900"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button> <button onclick="deleteDisciplina(${d.id})" class="text-red-500 hover:text-red-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button></td></tr>`).join('');
+        }
+        
+        // --- FORMS & CRUD ---
+        function showAlunoForm(id = null) {
+            const aluno = id ? db.alunos.find(a => a.id === id) : {};
+            const title = id ? 'Editar Aluno' : 'Adicionar Aluno';
+            const turmasOptions = db.turmas.map(t => `<option value="${t.id}" ${aluno.turmaId == t.id ? 'selected' : ''}>${t.nome}</option>`).join('');
+            const content = `<form id="aluno-form" class="space-y-4">
+                <input type="hidden" name="id" value="${aluno.id || ''}">
+                <input name="nome" placeholder="Nome" value="${aluno.nome || ''}" class="w-full p-2 border rounded">
+                <input name="matricula" placeholder="Matrícula" value="${aluno.matricula || ''}" class="w-full p-2 border rounded">
+                <input name="dataNascimento" type="date" value="${aluno.dataNascimento || ''}" class="w-full p-2 border rounded">
+                <select name="turmaId" class="w-full p-2 border rounded"><option value="">Selecione a turma</option>${turmasOptions}</select>
+                <div class="flex justify-end"><button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg">Salvar</button></div>
+            </form>`;
+            openModal(title, content);
+            document.getElementById('aluno-form').onsubmit = saveAluno;
+        }
+        function saveAluno(e) {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target));
+            data.turmaId = parseInt(data.turmaId);
+            if (data.id) {
+                const index = db.alunos.findIndex(a => a.id == data.id);
+                db.alunos[index] = { ...db.alunos[index], ...data };
+                logActivity('aluno', `Aluno ${data.nome} atualizado.`);
+            } else {
+                data.id = getNextId('alunos');
+                db.alunos.push(data);
+                logActivity('aluno', `Aluno ${data.nome} adicionado.`);
+            }
+            if (window.location.hash === '#alunos') renderAlunos();
+            closeModal();
+            renderDashboardStats();
+        }
+        function deleteAluno(id) {
+            const aluno = db.alunos.find(a => a.id === id);
+            if (confirm(`Excluir aluno ${aluno.nome}?`)) {
+                db.alunos = db.alunos.filter(a => a.id !== id);
+                logActivity('aluno', `Aluno ${aluno.nome} removido.`);
+                if (window.location.hash === '#alunos') renderAlunos();
+                renderDashboardStats();
+            }
+        }
+        
+        function showTurmaForm(id = null) {
+             const turma = id ? db.turmas.find(a => a.id === id) : {};
+            const title = id ? 'Editar Turma' : 'Adicionar Turma';
+            const content = `<form id="turma-form" class="space-y-4">
+                <input type="hidden" name="id" value="${turma.id || ''}">
+                <input name="nome" placeholder="Nome da Turma" value="${turma.nome || ''}" class="w-full p-2 border rounded">
+                <input name="anoLetivo" type="number" placeholder="Ano Letivo" value="${turma.anoLetivo || ''}" class="w-full p-2 border rounded">
+                <select name="turno" class="w-full p-2 border rounded"><option value="Manhã">Manhã</option><option value="Tarde">Tarde</option><option value="Noite">Noite</option></select>
+                <div class="flex justify-end"><button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg">Salvar</button></div>
+            </form>`;
+            openModal(title, content);
+            document.getElementById('turma-form').onsubmit = saveTurma;
+        }
+        function saveTurma(e) {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target));
+            data.anoLetivo = parseInt(data.anoLetivo);
+            if (data.id) {
+                const index = db.turmas.findIndex(a => a.id == data.id);
+                db.turmas[index] = { ...db.turmas[index], ...data };
+                logActivity('turma', `Turma ${data.nome} atualizada.`);
+            } else {
+                data.id = getNextId('turmas');
+                db.turmas.push(data);
+                logActivity('turma', `Turma ${data.nome} adicionada.`);
+            }
+            if (window.location.hash === '#turmas') renderTurmas();
+            closeModal();
+            renderDashboardStats();
+        }
+        function deleteTurma(id) {
+            const turma = db.turmas.find(t => t.id === id);
+            if (confirm(`Excluir turma ${turma.nome}?`)) {
+                db.turmas = db.turmas.filter(t => t.id !== id);
+                logActivity('turma', `Turma ${turma.nome} removida.`);
+                if (window.location.hash === '#turmas') renderTurmas();
+                renderDashboardStats();
+            }
+        }
+
+        function showDisciplinaForm(id = null) {
+            const disciplina = id ? db.disciplinas.find(d => d.id === id) : {};
+            const title = id ? 'Editar Disciplina' : 'Adicionar Disciplina';
+            const content = `<form id="disciplina-form" class="space-y-4">
+                <input type="hidden" name="id" value="${disciplina.id || ''}">
+                <input name="nome" placeholder="Nome da Disciplina" value="${disciplina.nome || ''}" class="w-full p-2 border rounded">
+                <input name="codigo" placeholder="Código" value="${disciplina.codigo || ''}" class="w-full p-2 border rounded">
+                <div class="flex justify-end"><button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg">Salvar</button></div>
+            </form>`;
+            openModal(title, content);
+            document.getElementById('disciplina-form').onsubmit = saveDisciplina;
+        }
+        function saveDisciplina(e) {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target));
+            if (data.id) {
+                const index = db.disciplinas.findIndex(d => d.id == data.id);
+                db.disciplinas[index] = { ...db.disciplinas[index], ...data };
+                logActivity('disciplina', `Disciplina ${data.nome} atualizada.`);
+            } else {
+                data.id = getNextId('disciplinas');
+                db.disciplinas.push(data);
+                logActivity('disciplina', `Disciplina ${data.nome} adicionada.`);
+            }
+            if (window.location.hash === '#turmas') renderDisciplinas();
+            closeModal();
+            renderDashboardStats();
+        }
+        function deleteDisciplina(id) {
+             const disciplina = db.disciplinas.find(d => d.id === id);
+            if (confirm(`Excluir disciplina ${disciplina.nome}?`)) {
+                db.disciplinas = db.disciplinas.filter(d => d.id !== id);
+                logActivity('disciplina', `Disciplina ${disciplina.nome} removida.`);
+                if (window.location.hash === '#turmas') renderDisciplinas();
+                renderDashboardStats();
+            }
+        }
+        
+        // --- MORE RENDERERS & FUNCTIONALITY ---
+        function populateNotasSelects(){
+            const turmaSelect = document.getElementById('select-turma-notas');
+            const disciplinaSelect = document.getElementById('select-disciplina-notas');
+            if(!turmaSelect || !disciplinaSelect) return;
+            turmaSelect.innerHTML = '<option value="">Selecione Turma</option>' + db.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+            disciplinaSelect.innerHTML = '<option value="">Selecione Disciplina</option>' + db.disciplinas.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+        }
+        function renderNotasTable() {
+            const turmaId = document.getElementById('select-turma-notas').value;
+            const disciplinaId = document.getElementById('select-disciplina-notas').value;
+            const container = document.getElementById('notas-alunos-container');
+            const tbody = document.getElementById('notas-table-body');
+            if (!turmaId || !disciplinaId) {
+                if(container) container.classList.add('hidden');
+                return;
+            }
+            const alunos = db.alunos.filter(a => a.turmaId == turmaId);
+            tbody.innerHTML = alunos.map(aluno => {
+                 let nota = db.notas.find(n => n.alunoId == aluno.id && n.disciplinaId == disciplinaId) || {};
+                 const notasValidas = [nota.b1, nota.b2, nota.b3, nota.b4].filter(v => v !== null && v !== undefined);
+                 const media = notasValidas.length ? (notasValidas.reduce((a,b) => a+b, 0) / notasValidas.length).toFixed(1) : '-';
+                 
+                 const getNotaClass = (n) => {
+                     if (n === null || n === undefined) return '';
+                     return n >= db.config.mediaAprovacao ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
+                 };
+
+                 return `<tr>
+                    <td class="p-2">${aluno.nome}</td>
+                    <td class="p-2"><input type="number" min="0" max="10" step="0.1" value="${nota.b1 || ''}" onchange="updateNota(event, ${aluno.id}, ${disciplinaId}, 'b1', this.value)" class="w-20 p-1 border rounded ${getNotaClass(nota.b1)}"></td>
+                    <td class="p-2"><input type="number" min="0" max="10" step="0.1" value="${nota.b2 || ''}" onchange="updateNota(event, ${aluno.id}, ${disciplinaId}, 'b2', this.value)" class="w-20 p-1 border rounded ${getNotaClass(nota.b2)}"></td>
+                    <td class="p-2"><input type="number" min="0" max="10" step="0.1" value="${nota.b3 || ''}" onchange="updateNota(event, ${aluno.id}, ${disciplinaId}, 'b3', this.value)" class="w-20 p-1 border rounded ${getNotaClass(nota.b3)}"></td>
+                    <td class="p-2"><input type="number" min="0" max="10" step="0.1" value="${nota.b4 || ''}" onchange="updateNota(event, ${aluno.id}, ${disciplinaId}, 'b4', this.value)" class="w-20 p-1 border rounded ${getNotaClass(nota.b4)}"></td>
+                    <td class="p-2 font-bold ${media !== '-' && media >= db.config.mediaAprovacao ? 'text-green-600' : 'text-red-600'}">${media}</td>
+                 </tr>`
+            }).join('');
+            container.classList.remove('hidden');
+        }
+        function updateNota(event, alunoId, disciplinaId, bimestre, valor){
+             const inputElement = event.target;
+             const notaValue = valor === '' ? null : parseFloat(valor);
+
+             if (notaValue !== null && (notaValue < 0 || notaValue > 10)) {
+                openModal('Nota Inválida', '<p>A nota deve ser um valor entre 0 e 10.</p>');
+                const oldNota = db.notas.find(n => n.alunoId == alunoId && n.disciplinaId == disciplinaId);
+                inputElement.value = oldNota ? (oldNota[bimestre] || '') : '';
+                return;
+             }
+
+             let nota = db.notas.find(n => n.alunoId == alunoId && n.disciplinaId == disciplinaId);
+             if(!nota){
+                 nota = { alunoId: parseInt(alunoId), disciplinaId: parseInt(disciplinaId), b1: null, b2: null, b3: null, b4: null };
+                 db.notas.push(nota);
+             }
+             nota[bimestre] = notaValue;
+
+             inputElement.classList.remove('text-green-600', 'text-red-600', 'font-bold');
+             if (notaValue !== null) {
+                if (notaValue >= db.config.mediaAprovacao) {
+                    inputElement.classList.add('text-green-600', 'font-bold');
+                } else {
+                    inputElement.classList.add('text-red-600', 'font-bold');
+                }
+             }
+
+             const row = inputElement.closest('tr');
+             const mediaCell = row.querySelector('td:last-child');
+             const notasValidas = [nota.b1, nota.b2, nota.b3, nota.b4].filter(v => v !== null && v !== undefined);
+             const media = notasValidas.length ? (notasValidas.reduce((a,b) => a+b, 0) / notasValidas.length).toFixed(1) : '-';
+             mediaCell.textContent = media;
+             mediaCell.classList.remove('text-green-600', 'text-red-600');
+             if (media !== '-' && media >= db.config.mediaAprovacao) {
+                mediaCell.classList.add('text-green-600');
+             } else if (media !== '-') {
+                mediaCell.classList.add('text-red-600');
+             }
+
+             renderDashboard();
+             logActivity('nota', `Nota atualizada para aluno ID ${alunoId}.`);
+        }
+        
+        function populateFrequenciaSelects() {
+             const turmaSelect = document.getElementById('select-turma-frequencia');
+            const disciplinaSelect = document.getElementById('select-disciplina-frequencia');
+            if(!turmaSelect || !disciplinaSelect) return;
+            turmaSelect.innerHTML = '<option value="">Selecione Turma</option>' + db.turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+            disciplinaSelect.innerHTML = '<option value="">Selecione Disciplina</option>' + db.disciplinas.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+        }
+        function renderFrequenciaTable(){
+            const turmaId = document.getElementById('select-turma-frequencia').value;
+            const disciplinaId = document.getElementById('select-disciplina-frequencia').value;
+            const data = document.getElementById('data-frequencia').value;
+            const container = document.getElementById('frequencia-alunos-container');
+            const tbody = document.getElementById('frequencia-table-body');
+            if (!turmaId || !disciplinaId || !data) {
+                if(container) container.classList.add('hidden');
+                return;
+            }
+            const alunos = db.alunos.filter(a => a.turmaId == turmaId);
+            tbody.innerHTML = alunos.map(aluno => {
+                const registro = db.frequencia.find(f => f.alunoId == aluno.id && f.disciplinaId == disciplinaId && f.data == data);
+                const presente = registro ? registro.presente : false; // Default to absent
+                return `<tr>
+                    <td class="p-2">${aluno.nome}</td>
+                    <td class="p-2">
+                        <button onclick="toggleFrequencia(this, ${aluno.id}, ${disciplinaId}, '${data}')" class="btn-frequencia ${presente ? 'btn-presente active' : 'btn-ausente'}">
+                           ${presente ? 'Presente' : 'Ausente'}
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+            container.classList.remove('hidden');
+        }
+        function toggleFrequencia(btn, alunoId, disciplinaId, data){
+            let registro = db.frequencia.find(f => f.alunoId == alunoId && f.disciplinaId == disciplinaId && f.data == data);
+            if(registro){
+                registro.presente = !registro.presente;
+            } else {
+                registro = { alunoId:parseInt(alunoId), disciplinaId:parseInt(disciplinaId), data, presente: true };
+                db.frequencia.push(registro);
+            }
+            btn.textContent = registro.presente ? 'Presente' : 'Ausente';
+            btn.classList.toggle('btn-presente');
+            btn.classList.toggle('btn-ausente');
+            btn.classList.toggle('active', registro.presente);
+        }
+        
+        function renderCalendario() {
+            const grid = document.getElementById('calendar-grid');
+            const title = document.getElementById('calendar-title');
+            const headers = document.getElementById('calendar-headers');
+            if(!grid) return;
+            
+            grid.innerHTML = '';
+            headers.innerHTML = '';
+            
+            const month = currentCalendarDate.getMonth();
+            const year = currentCalendarDate.getFullYear();
+            
+            title.textContent = `${currentCalendarDate.toLocaleString('pt-BR', { month: 'long' })} ${year}`;
+            
+            ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].forEach(day => {
+                headers.innerHTML += `<div class="calendar-day-header">${day}</div>`;
+            });
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for(let i = 0; i < firstDay; i++) grid.innerHTML += '<div class="border border-gray-200"></div>';
+            
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dayDate = new Date(year, month, i);
+                const dateStr = dayDate.toISOString().split('T')[0];
+                const eventosDoDia = db.eventos.filter(e => e.data === dateStr);
+                const eventoHTML = eventosDoDia.map(e => {
+                    let colorClass = 'bg-gray-500';
+                    if (e.tipo === 'prova') colorClass = 'bg-blue-500';
+                    if (e.tipo === 'evento') colorClass = 'bg-green-500';
+                    if (e.tipo === 'entrega') colorClass = 'bg-yellow-500';
+                    return `<div class="flex items-center text-left text-xs p-1 bg-gray-100 dark:bg-gray-700 rounded mb-1 overflow-hidden">
+                        <span class="event-dot ${colorClass} shrink-0"></span>
+                        <span class="truncate ml-1">${e.titulo}</span>
+                    </div>`;
+                }).join('');
+
+                grid.innerHTML += `<div class="calendar-day cursor-pointer hover:bg-purple-50 transition-colors flex flex-col items-start" onclick="showEventoForm('${dateStr}')">
+                    <div class="self-end font-medium">${i}</div>
+                    <div class="w-full mt-1">${eventoHTML}</div>
+                </div>`;
+            }
+        }
+        function changeMonth(offset) {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset);
+            renderCalendario();
+        }
+        function showEventoForm(dateStr) {
+            const title = 'Adicionar Evento';
+            const content = `<form id="evento-form" class="space-y-4">
+                <input type="hidden" name="data" value="${dateStr}">
+                <div>
+                    <label class="block text-sm font-medium">Data</label>
+                    <input type="text" value="${new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR')}" disabled class="w-full p-2 border rounded bg-gray-100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Título do Evento</label>
+                    <input name="titulo" placeholder="Ex: Prova de História" required class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Tipo de Evento</label>
+                    <select name="tipo" class="w-full p-2 border rounded">
+                        <option value="prova">Prova</option>
+                        <option value="evento">Evento</option>
+                        <option value="entrega">Entrega</option>
+                    </select>
+                </div>
+                <div class="flex justify-end"><button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg">Salvar Evento</button></div>
+            </form>`;
+            openModal(title, content);
+            document.getElementById('evento-form').onsubmit = saveEvento;
+        }
+        function saveEvento(e) {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target));
+            const newEvent = {
+                data: data.data,
+                titulo: data.titulo,
+                tipo: data.tipo,
+            };
+            db.eventos.push(newEvent);
+            logActivity('info', `Novo evento adicionado: ${data.titulo}`);
+            closeModal();
+            renderCalendario();
+        }
+        function populateBoletimSelect() {
+            const select = document.getElementById('select-aluno-boletim');
+            if(!select) return;
+            select.innerHTML = '<option value="">Selecione um Aluno</option>' + db.alunos.map(a => `<option value="${a.id}">${a.nome}</option>`).join('');
+        }
+        function populateGraficoSelect() {
+            const select = document.getElementById('select-aluno-grafico');
+            if(!select) return;
+            select.innerHTML = '<option value="">Selecione um Aluno</option>' + db.alunos.map(a => `<option value="${a.id}">${a.nome}</option>`).join('');
+        }
+        function gerarBoletim() {
+            const alunoId = document.getElementById('select-aluno-boletim').value;
+            if (!alunoId) {
+                openModal('Atenção', `<p>Por favor, selecione um aluno para gerar o boletim.</p>`);
+                return;
+            }
+
+            const aluno = db.alunos.find(a => a.id == alunoId);
+            const turma = db.turmas.find(t => t.id == aluno.turmaId);
+            const notasAluno = db.notas.filter(n => n.alunoId == alunoId);
+            
+            let notasHtml = '';
+            let mediaGeralTotal = 0;
+            let countDisciplinasComNota = 0;
+
+            db.disciplinas.forEach(disciplina => {
+                const notas = notasAluno.find(n => n.disciplinaId === disciplina.id) || {};
+                const notasArray = [notas.b1, notas.b2, notas.b3, notas.b4].filter(n => n !== null && n !== undefined);
+                const media = notasArray.length > 0 ? (notasArray.reduce((a, b) => a + b, 0) / notasArray.length) : 0;
+                
+                if (notasArray.length > 0) {
+                  mediaGeralTotal += media;
+                  countDisciplinasComNota++;
+                }
+
+                notasHtml += `
+                    <tr class="border-b">
+                        <td class="p-2 font-medium">${disciplina.nome}</td>
+                        <td class="p-2 text-center">${notas.b1?.toFixed(1) || '-'}</td>
+                        <td class="p-2 text-center">${notas.b2?.toFixed(1) || '-'}</td>
+                        <td class="p-2 text-center">${notas.b3?.toFixed(1) || '-'}</td>
+                        <td class="p-2 text-center">${notas.b4?.toFixed(1) || '-'}</td>
+                        <td class="p-2 text-center font-bold ${media >= db.config.mediaAprovacao ? 'text-blue-600' : 'text-red-600'}">${media > 0 ? media.toFixed(1) : '-'}</td>
+                    </tr>
+                `;
+            });
+            
+            const mediaGeralFinal = countDisciplinasComNota > 0 ? (mediaGeralTotal / countDisciplinasComNota).toFixed(1) : 'N/A';
+            const status = mediaGeralFinal >= db.config.mediaAprovacao ? '<span class="text-green-600 font-bold">Aprovado</span>' : '<span class="text-red-600 font-bold">Recuperação</span>';
+
+            const boletimContent = `
+                <div id="boletim-para-imprimir">
+                    <div class="p-4 text-gray-800">
+                        <div class="text-center mb-6">
+                            <h1 class="text-2xl font-bold">Boletim Escolar - ${db.config.anoLetivo}</h1>
+                            <p>Escola Exemplo Digital</p>
+                        </div>
+                        <div class="mb-4 text-sm">
+                            <p><strong>Aluno:</strong> ${aluno.nome}</p>
+                            <p><strong>Matrícula:</strong> ${aluno.matricula}</p>
+                            <p><strong>Turma:</strong> ${turma ? turma.nome : 'N/A'}</p>
+                        </div>
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="p-2 text-left">Disciplina</th>
+                                    <th class="p-2">1º Bim</th>
+                                    <th class="p-2">2º Bim</th>
+                                    <th class="p-2">3º Bim</th>
+                                    <th class="p-2">4º Bim</th>
+                                    <th class="p-2">Média Final</th>
+                                </tr>
+                            </thead>
+                            <tbody>${notasHtml}</tbody>
+                        </table>
+                        <div class="mt-6 text-right">
+                            <p><strong>Média Geral:</strong> ${mediaGeralFinal}</p>
+                            <p><strong>Status Final:</strong> ${status}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 flex justify-end print-hidden">
+                    <button onclick="window.print()" class="bg-purple-600 text-white px-4 py-2 rounded-lg animated-button">Imprimir / Salvar PDF</button>
+                </div>
+            `;
+
+            openModal(`Boletim de ${aluno.nome}`, boletimContent, 'max-w-2xl');
+        }
+        
+        function renderGraficoDesempenho(){
+            const alunoId = document.getElementById('select-aluno-grafico')?.value;
+            const canvas = document.getElementById('desempenho-chart');
+            if(!alunoId || !canvas) {
+                if(currentChart) currentChart.destroy();
+                return;
+            };
+            
+            const ctx = canvas.getContext('2d');
+            const notasAluno = db.notas.filter(n => n.alunoId == alunoId);
+            
+            if (currentChart) currentChart.destroy();
+
+            const colors = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#6366F1'];
+
+            currentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Bim 1', 'Bim 2', 'Bim 3', 'Bim 4'],
+                    datasets: db.disciplinas.map((d, i) => {
+                        const nota = notasAluno.find(n => n.disciplinaId === d.id);
+                        const color = colors[i % colors.length];
+                        return {
+                            label: d.nome,
+                            data: nota ? [nota.b1, nota.b2, nota.b3, nota.b4] : [],
+                            backgroundColor: color,
+                            borderColor: color,
+                            borderWidth: 1,
+                            hidden: !nota
+                        }
+                    })
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 10 } },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+        function gerarRelatorioRecuperacao() { openModal('Relatório', 'Função a ser implementada.'); }
+        function gerarRelatorioFaltas() { openModal('Relatório', 'Função a ser implementada.'); }
+        function gerarRelatorioMediaTurma() { openModal('Relatório', 'Função a ser implementada.'); }
+
+        function loadConfig() {
+            document.getElementById('media-aprovacao').value = db.config.mediaAprovacao;
+            document.getElementById('ano-letivo').value = db.config.anoLetivo;
+        }
+        function saveConfig() {
+            db.config.mediaAprovacao = parseFloat(document.getElementById('media-aprovacao').value);
+            db.config.anoLetivo = parseInt(document.getElementById('ano-letivo').value);
+            logActivity('info', 'Configurações salvas.');
+            openModal('Sucesso', 'Configurações salvas com sucesso!');
+        }
+        function handleCsvImport(event) { openModal('Importar CSV', 'Função a ser implementada.'); }
+        function handleCsvExport() { openModal('Exportar CSV', 'Função a ser implementada.'); }
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            setupNavigation();
+            setupDarkMode();
+            const initialPage = window.location.hash.substring(1) || 'dashboard';
+            loadPage(initialPage);
+        });
+    </script>
+</body>
+</html>
+
